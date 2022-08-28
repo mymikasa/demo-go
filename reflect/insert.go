@@ -1,6 +1,7 @@
 package reflect
 
 import (
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"reflect"
@@ -14,14 +15,58 @@ type InsertField struct {
 	fieldNames  []string
 	fieldValues []any
 	err         error
+
+	fieldMap map[string]bool
 }
 
 func NewInsertField() *InsertField {
-	return &InsertField{}
+	return &InsertField{fieldMap: make(map[string]bool)}
 }
 
-func (i *InsertField) HandleStruct() {
+func (i *InsertField) HandleEntity(val reflect.Value) error {
 
+	// handle nil
+	if val.IsValid() == false {
+		return errInvalidEntity
+	}
+	typ := val.Type()
+
+	if typ.Kind() != reflect.Struct && !(typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct) {
+		return errInvalidEntity
+	}
+
+	if val.Kind() == reflect.Struct {
+		fieldNum := val.NumField()
+		if fieldNum == 0 {
+			return errInvalidEntity
+		}
+		for j := 0; j < fieldNum; j++ {
+			refVal := val.Field(j)
+			isImplementsDriver := refVal.Type().Implements(reflect.TypeOf((*driver.Valuer)(nil)).Elem())
+			isAnonymous := val.Type().Field(j).Anonymous
+
+			if refVal.Kind() == reflect.Struct && !isImplementsDriver && isAnonymous {
+				err := i.HandleEntity(refVal)
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			_, ok := i.fieldMap[typ.Field(j).Name]
+			if ok {
+				continue
+			} else {
+				i.fieldMap[typ.Field(j).Name] = true
+				i.fieldNames = append(i.fieldNames, "`"+typ.Field(j).Name+"`")
+				i.fieldValues = append(i.fieldValues, val.Field(j).Interface())
+			}
+		}
+		return nil
+	} else {
+		i.fieldValues = append(i.fieldValues, val.Interface())
+		//val.Type().Name()
+		return nil
+	}
 }
 
 func (i *InsertField) GenerateSql() string {
@@ -31,27 +76,28 @@ func (i *InsertField) GenerateSql() string {
 }
 
 func InsertStmt(entity interface{}) (string, []interface{}, error) {
+	i := NewInsertField()
 
-	insertField := NewInsertField()
 	val := reflect.ValueOf(entity)
-	typ := val.Type()
 
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
-	}
-
-	insertField.name = "`" + typ.Name() + "`"
-	fmt.Println(insertField.name)
-
-	if val.IsValid() == false || val.NumField() == 0 {
+	if val.IsValid() == false {
 		return "", nil, errInvalidEntity
 	}
-	for i := 0; i < val.NumField(); i++ {
-		insertField.fieldValues = append(insertField.fieldValues, val.Field(i).Interface())
-		insertField.fieldNames = append(insertField.fieldNames, "`"+typ.Field(i).Name+"`")
-	}
-	return insertField.GenerateSql(), insertField.fieldValues, nil
 
+	typ := val.Type()
+	if typ.Kind() != reflect.Struct && !(typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Struct) {
+		return "", nil, errInvalidEntity
+	}
+	for typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+		val = val.Elem()
+	}
+	i.name = "`" + typ.Name() + "`"
+	err := i.HandleEntity(val)
+	if err != nil {
+		return "", nil, err
+	}
+	return i.GenerateSql(), i.fieldValues, nil
 	//bd := strings.Builder{}
 	//bd.Write()
 
@@ -76,5 +122,5 @@ func InsertStmt(entity interface{}) (string, []interface{}, error) {
 	// 注意，在第一次遍历的时候我们就已经拿到了参数的值，所以这里就是简单拼接 ?,?,?
 
 	// return bd.String(), args, nil
-	panic("implement me")
+	//panic("implement me")
 }

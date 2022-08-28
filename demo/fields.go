@@ -24,11 +24,11 @@ func iterateFields(val any) (map[string]any, error) {
 	}
 
 	typ := reflect.TypeOf(val)
-
+	refVal := reflect.ValueOf(val)
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
+		refVal = refVal.Elem()
 	}
-	refVal := reflect.ValueOf(val)
 
 	numFiled := typ.NumField()
 	res := make(map[string]any, numFiled)
