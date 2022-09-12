@@ -82,6 +82,33 @@ func TestIterateFuncs(t *testing.T) {
 					Out:    []reflect.Type{reflect.TypeOf(int64(18))},
 					Result: []any{int64(18)},
 				},
+			},
+		},
+		{
+			name: "pointer type but input struct",
+			args: args{
+				val: OrderV1{
+					buyer:  18,
+					seller: 100,
+				},
+			},
+			want: map[string]*FuncInfo{},
+		},
+		{
+			name: "struct type but input ptr",
+			args: args{
+				val: &Order{
+					buyer:  18,
+					seller: 100,
+				},
+			},
+			want: map[string]*FuncInfo{
+				"GetBuyer": {
+					Name:   "GetBuyer",
+					In:     []reflect.Type{reflect.TypeOf(&Order{})},
+					Out:    []reflect.Type{reflect.TypeOf(int64(18))},
+					Result: []any{int64(18)},
+				},
 				//"getSeller": {
 				//	Name:   "getSeller",
 				//	In:     []reflect.Type{reflect.TypeOf(Order{})},
@@ -108,7 +135,7 @@ type Order struct {
 	seller int64
 }
 
-func (o Order) GetBuyer() int64 {
+func (o Order) GetBuyer(a int) int64 {
 	return o.buyer
 }
 
@@ -123,4 +150,18 @@ type OrderV1 struct {
 
 func (o *OrderV1) GetBuyer() int64 {
 	return o.buyer
+}
+
+type MyInterface interface {
+	Abc()
+}
+
+var _ MyInterface = &abcImpl{}
+
+type abcImpl struct {
+}
+
+func (a *abcImpl) Abc() {
+	//TODO implement me
+	panic("implement me")
 }

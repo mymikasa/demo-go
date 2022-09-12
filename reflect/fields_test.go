@@ -1,4 +1,4 @@
-package demo
+package reflect
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-type User struct {
+type User1 struct {
 	Name string
 }
 
@@ -24,7 +24,7 @@ func TestIterateFields(t *testing.T) {
 		},
 		{
 			name: "user",
-			val: User{
+			val: User1{
 				Name: "Tom",
 			},
 			wantErr: nil,
@@ -34,7 +34,7 @@ func TestIterateFields(t *testing.T) {
 		},
 		{
 			name: "ptr",
-			val: &User{
+			val: &User1{
 				Name: "Mikasa",
 			},
 			wantErr: nil,
